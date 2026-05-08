@@ -14,12 +14,11 @@ const (
 	NeedleHeaderSize  = 20
 	NeedlePaddingSize = 8
 	NeedleChecksum    = 4
-	SuperBlockSize    = 8
 )
 
 type Needle struct {
 	Cookie uint32
-	Id     uint64
+	ID     uint64
 	Size   uint32
 	Data   []byte
 }
@@ -34,28 +33,28 @@ func NeedleDiskSize(dataSize uint32) int64 {
 }
 
 func (n *Needle) Marshal() []byte {
-	out := make([]byte, NeedleDiskSize(n.Size))
+	buf := make([]byte, NeedleDiskSize(n.Size))
 
 	// Magic bytes
-	copy(out[0:4], magicBytes)
+	copy(buf[0:4], magicBytes)
 
 	// Cookie
-	binary.BigEndian.PutUint32(out[4:8], n.Cookie)
+	binary.BigEndian.PutUint32(buf[4:8], n.Cookie)
 
 	// ID
-	binary.BigEndian.PutUint64(out[8:16], n.Id)
+	binary.BigEndian.PutUint64(buf[8:16], n.ID)
 
 	// Size
-	binary.BigEndian.PutUint32(out[16:20], n.Size)
+	binary.BigEndian.PutUint32(buf[16:20], n.Size)
 
 	// Data
-	copy(out[NeedleHeaderSize:NeedleHeaderSize+int(n.Size)], n.Data)
+	copy(buf[NeedleHeaderSize:NeedleHeaderSize+int(n.Size)], n.Data)
 
 	// Checksum
 	checksum := crc32.ChecksumIEEE(n.Data)
-	binary.BigEndian.PutUint32(out[NeedleHeaderSize+int(n.Size):NeedleHeaderSize+int(n.Size)+NeedleChecksum], checksum)
+	binary.BigEndian.PutUint32(buf[NeedleHeaderSize+int(n.Size):NeedleHeaderSize+int(n.Size)+NeedleChecksum], checksum)
 
-	return out
+	return buf
 }
 
 func ReadNeedleAt(r io.ReaderAt, offset int64) (*Needle, error) {
@@ -78,18 +77,18 @@ func ReadNeedleAt(r io.ReaderAt, offset int64) (*Needle, error) {
 	}
 
 	// Check data checksum
-	checksum := crc32.ChecksumIEEE(data[:len(data)-4])
-	cs := binary.BigEndian.Uint32(data[len(data)-4:])
-	if checksum != cs {
+	computedChecksum := crc32.ChecksumIEEE(data[:len(data)-4])
+	storedChecksum := binary.BigEndian.Uint32(data[len(data)-4:])
+	if computedChecksum != storedChecksum {
 		return nil, fmt.Errorf("corrupted data")
 	}
 
-	in := &Needle{
+	n := &Needle{
 		Cookie: binary.BigEndian.Uint32(header[4:8]),
-		Id:     binary.BigEndian.Uint64(header[8:16]),
+		ID:     binary.BigEndian.Uint64(header[8:16]),
 		Size:   binary.BigEndian.Uint32(header[16:20]),
 		Data:   data[:len(data)-4],
 	}
 
-	return in, nil
+	return n, nil
 }
