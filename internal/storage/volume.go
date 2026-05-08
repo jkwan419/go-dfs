@@ -22,12 +22,12 @@ func NewVolume(id uint64, file *os.File, index map[uint64]int64, offset int64) *
 }
 
 func (v *Volume) Read(needleID uint64) (*Needle, error) {
-	key, ok := v.Index[needleID]
+	offset, ok := v.Index[needleID]
 	if !ok {
 		return nil, fmt.Errorf("needleID does not exist")
 	}
 
-	needle, err := ReadNeedleAt(v.File, key)
+	needle, err := ReadNeedleAt(v.File, offset)
 	if err != nil {
 		return nil, err
 	}
