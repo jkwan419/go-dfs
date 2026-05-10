@@ -10,23 +10,23 @@ func TestParseFileId(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		want    FileId
+		want    FileID
 		wantErr bool
 	}{
 		{
 			name:  "normal case",
 			input: "3,0000000000000001deadbeef",
-			want:  FileId{VolumeID: 3, Key: 1, Cookie: 0xdeadbeef},
+			want:  FileID{VolumeID: 3, Key: 1, Cookie: 0xdeadbeef},
 		},
 		{
 			name:  "zero key and cookie",
 			input: "1,000000000000000000000000",
-			want:  FileId{VolumeID: 1, Key: 0, Cookie: 0},
+			want:  FileID{VolumeID: 1, Key: 0, Cookie: 0},
 		},
 		{
 			name:  "max values",
 			input: fmt.Sprintf("%d,%016x%08x", uint32(math.MaxUint32), uint64(math.MaxUint64), uint32(math.MaxUint32)),
-			want:  FileId{VolumeID: math.MaxUint32, Key: math.MaxUint64, Cookie: math.MaxUint32},
+			want:  FileID{VolumeID: math.MaxUint32, Key: math.MaxUint64, Cookie: math.MaxUint32},
 		},
 		{
 			name:    "empty string",
