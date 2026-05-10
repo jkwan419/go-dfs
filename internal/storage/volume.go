@@ -6,18 +6,20 @@ import (
 )
 
 type Volume struct {
-	ID     uint64
-	File   *os.File
-	Index  map[uint64]int64
-	Offset int64
+	ID         uint64
+	VolumeFile *os.File
+	IndexFile  *os.File
+	Index      map[uint64]int64
+	Offset     int64
 }
 
-func NewVolume(id uint64, file *os.File, index map[uint64]int64, offset int64) *Volume {
+func NewVolume(id uint64, vFile *os.File, iFile *os.File, index map[uint64]int64, offset int64) *Volume {
 	return &Volume{
-		ID:     id,
-		File:   file,
-		Index:  index,
-		Offset: offset,
+		ID:         id,
+		VolumeFile: vFile,
+		IndexFile:  iFile,
+		Index:      index,
+		Offset:     offset,
 	}
 }
 
@@ -27,7 +29,7 @@ func (v *Volume) Read(needleID uint64) (*Needle, error) {
 		return nil, fmt.Errorf("needleID does not exist")
 	}
 
-	needle, err := ReadNeedleAt(v.File, offset)
+	needle, err := ReadNeedleAt(v.VolumeFile, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +38,12 @@ func (v *Volume) Read(needleID uint64) (*Needle, error) {
 }
 
 func (v *Volume) Write(needle Needle) error {
-	_, err := v.File.WriteAt(needle.Marshal(), v.Offset)
+	_, err := v.VolumeFile.WriteAt(needle.Marshal(), v.Offset)
+	if err != nil {
+		return err
+	}
+
+	err = WriteToFile(v.IndexFile, needle.ID, v.Offset)
 	if err != nil {
 		return err
 	}
