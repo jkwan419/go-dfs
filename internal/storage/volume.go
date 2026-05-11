@@ -13,13 +13,13 @@ type Volume struct {
 	Offset     int64
 }
 
-func NewVolume(id uint64, vFile *os.File, iFile *os.File, index map[uint64]int64, offset int64) *Volume {
+func NewVolume(id uint64, vFile *os.File, iFile *os.File) *Volume {
 	return &Volume{
 		ID:         id,
 		VolumeFile: vFile,
 		IndexFile:  iFile,
-		Index:      index,
-		Offset:     offset,
+		Index:      make(map[uint64]int64),
+		Offset:     0,
 	}
 }
 
