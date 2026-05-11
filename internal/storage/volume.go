@@ -37,7 +37,7 @@ func (v *Volume) Read(needleID uint64) (*Needle, error) {
 	return needle, nil
 }
 
-func (v *Volume) Write(needle Needle) error {
+func (v *Volume) Write(needle *Needle) error {
 	_, err := v.VolumeFile.WriteAt(needle.Marshal(), v.Offset)
 	if err != nil {
 		return err
