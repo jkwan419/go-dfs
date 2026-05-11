@@ -61,7 +61,7 @@ func TestVolumeRead(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := volume.Read(tt.input)
 			if (err != nil) != tt.expectedErr {
-				t.Errorf("Write(%q) error = %v, expectedErr %v", tt.input, err, tt.expectedErr)
+				t.Errorf("Read(%q) error = %v, expectedErr %v", tt.input, err, tt.expectedErr)
 				return
 			}
 			if !tt.expectedErr {
@@ -83,5 +83,58 @@ func TestVolumeRead(t *testing.T) {
 }
 
 func TestVolumeWrite(t *testing.T) {
+	vFile, err := os.CreateTemp("", "volume-test-*.dat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		vFile.Close()
+		os.Remove(vFile.Name())
+	})
 
+	iFile, err := os.CreateTemp("", "index-test-*.idx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		iFile.Close()
+		os.Remove(iFile.Name())
+	})
+
+	volume := NewVolume(0x0000000000000000, vFile, iFile)
+
+	needle := &Needle{
+		Cookie: 0xDEADBEEF,
+		ID:     0x0000000000000001,
+		Data:   []byte("test"),
+		Size:   4,
+	}
+
+	tests := []struct {
+		name        string
+		input       *Needle
+		expectedErr bool
+	}{
+		{
+			name:  "happy path",
+			input: needle,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := volume.Write(tt.input)
+			if (err != nil) != tt.expectedErr {
+				t.Errorf("Write(%q) error = %v, expectedErr %v", tt.input, err, tt.expectedErr)
+			}
+			if !tt.expectedErr {
+				if volume.Index[tt.input.ID] != 0 {
+					t.Errorf("Offset = %v, expected = 0", volume.Index[tt.input.ID])
+				}
+				if volume.Offset != NeedleDiskSize(tt.input.Size) {
+					t.Errorf("Offset = %v, expected = %v", volume.Offset, NeedleDiskSize(tt.input.Size))
+				}
+			}
+		})
+	}
 }
