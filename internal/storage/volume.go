@@ -11,6 +11,7 @@ type Volume struct {
 	IndexFile  *os.File
 	Index      map[uint64]int64
 	Offset     int64
+	NextID     uint64
 }
 
 func NewVolume(id uint64, vFile *os.File, iFile *os.File) *Volume {
@@ -20,6 +21,7 @@ func NewVolume(id uint64, vFile *os.File, iFile *os.File) *Volume {
 		IndexFile:  iFile,
 		Index:      make(map[uint64]int64),
 		Offset:     0,
+		NextID:     0,
 	}
 }
 
@@ -50,6 +52,7 @@ func (v *Volume) Write(needle *Needle) error {
 
 	v.Index[needle.ID] = v.Offset
 	v.Offset += NeedleDiskSize(needle.Size)
+	v.NextID += 1
 
 	return nil
 }

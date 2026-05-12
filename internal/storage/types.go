@@ -49,3 +49,12 @@ func ParseFileID(s string) (FileID, error) {
 
 	return FileID{VolumeID: VolumeID(vid64), Key: key, Cookie: uint32(cookie)}, nil
 }
+
+func ParseVolumeID(s string) (VolumeID, error) {
+	value, err := strconv.ParseUint(s, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+
+	return VolumeID(value), nil
+}
