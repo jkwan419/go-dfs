@@ -6,7 +6,7 @@ import (
 )
 
 type Volume struct {
-	ID         uint64
+	ID         VolumeID
 	VolumeFile *os.File
 	IndexFile  *os.File
 	Index      map[uint64]int64
@@ -14,7 +14,7 @@ type Volume struct {
 	NextID     uint64
 }
 
-func NewVolume(id uint64, vFile *os.File, iFile *os.File) *Volume {
+func NewVolume(id VolumeID, vFile *os.File, iFile *os.File) *Volume {
 	return &Volume{
 		ID:         id,
 		VolumeFile: vFile,
