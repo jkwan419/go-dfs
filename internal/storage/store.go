@@ -25,8 +25,7 @@ func (s *Store) AddVolume(id VolumeID, volume *Volume) error {
 	_, ok := s.Volumes[id]
 	if ok {
 		return fmt.Errorf("volume id %s already exists", id)
-	} else {
-		s.Volumes[id] = volume
 	}
+	s.Volumes[id] = volume
 	return nil
 }
