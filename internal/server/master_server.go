@@ -11,23 +11,23 @@ import (
 
 type VolumeInfo struct {
 	Addr string
-	Size uint32
+	Size uint64
 }
 
 type MasterServer struct {
-	Addr              string
-	Volumes           map[storage.VolumeID]*VolumeInfo
-	VolumeServers     []string
-	VolumeSizeLimitMB uint32
-	NextVolumeID      storage.VolumeID
+	Addr                 string
+	Volumes              map[storage.VolumeID]*VolumeInfo
+	VolumeServers        []string
+	VolumeSizeLimitBytes uint64
+	NextVolumeID         storage.VolumeID
 }
 
 func NewMasterServer(addr string) *MasterServer {
 	return &MasterServer{
-		Addr:              addr,
-		Volumes:           make(map[storage.VolumeID]*VolumeInfo),
-		VolumeSizeLimitMB: 3000,
-		NextVolumeID:      0,
+		Addr:                 addr,
+		Volumes:              make(map[storage.VolumeID]*VolumeInfo),
+		VolumeSizeLimitBytes: 3 * 1024 * 1024 * 1024,
+		NextVolumeID:         0,
 	}
 }
 

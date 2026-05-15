@@ -13,5 +13,5 @@ type UploadResponse struct {
 
 type UpdateVolumeRequest struct {
 	VolumeID storage.VolumeID
-	Size     uint32
+	Size     uint64
 }
