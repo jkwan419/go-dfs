@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/jkwan419/go-dfs/internal/storage"
 )
@@ -140,4 +142,30 @@ func (s *VolumeServer) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *VolumeServer) worker(ctx context.Context, pulseInterval time.Duration) (<-chan struct{}, <-chan int) {
+	heartbeat := make(chan struct{})
+	results := make(chan int)
+
+	go func() {
+		defer close(heartbeat)
+		defer close(results)
+
+		pulse := time.NewTicker(pulseInterval)
+		defer pulse.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-pulse.C:
+				select {
+				case heartbeat <- struct{}{}:
+				default:
+				}
+			}
+		}
+	}()
+	return heartbeat, results
 }
