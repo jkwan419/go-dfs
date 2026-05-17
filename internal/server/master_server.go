@@ -2,10 +2,11 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/jkwan419/go-dfs/internal/storage"
 )
@@ -33,7 +34,7 @@ func NewMasterServer(addr string) *MasterServer {
 	}
 }
 
-func (s *MasterServer) Start() {
+func (s *MasterServer) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/read", s.Read)
@@ -41,10 +42,25 @@ func (s *MasterServer) Start() {
 	mux.HandleFunc("/register", s.Register)
 	mux.HandleFunc("/update", s.UpdateVolume)
 
-	err := http.ListenAndServe(s.Addr, mux)
-	if err != nil {
-		log.Fatal(err)
+	srv := &http.Server{Addr: s.Addr, Handler: mux}
+
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			srv.Shutdown(shutdownCtx)
+		case <-done:
+		}
+	}()
+
+	err := srv.ListenAndServe()
+	close(done)
+	if err == http.ErrServerClosed {
+		return nil
 	}
+	return err
 }
 
 func (s *MasterServer) Read(w http.ResponseWriter, r *http.Request) {
@@ -56,8 +72,8 @@ func (s *MasterServer) Read(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
-	volume, ok := s.Volumes[vid]
 	defer s.mu.Unlock()
+	volume, ok := s.Volumes[vid]
 
 	if !ok {
 		http.Error(w, "invalid volume id", http.StatusBadRequest)
@@ -75,10 +91,10 @@ func (s *MasterServer) Upload(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.Lock()
 	if vid, found := s.findWriteableVolume(); found {
-		s.mu.Unlock()
 		targetVid = vid
 		targetAddr = s.Volumes[vid].Addr
 		needsCreate = false
+		s.mu.Unlock()
 	} else if len(s.VolumeServers) == 0 {
 		s.mu.Unlock()
 		http.Error(w, "no volume servers registered", http.StatusBadRequest)
@@ -127,8 +143,8 @@ func (s *MasterServer) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
-	s.VolumeServers = append(s.VolumeServers, req.Addr)
 	defer s.mu.Unlock()
+	s.VolumeServers = append(s.VolumeServers, req.Addr)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
@@ -142,16 +158,12 @@ func (s *MasterServer) UpdateVolume(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
-	volume, ok := s.Volumes[req.VolumeID]
 	defer s.mu.Unlock()
+	volume, ok := s.Volumes[req.VolumeID]
 	if !ok {
 		http.Error(w, "invalid volume id", http.StatusBadRequest)
 		return
 	}
-
-	s.mu.Lock()
 	volume.Size = req.Size
-	defer s.mu.Unlock()
-
 	w.WriteHeader(http.StatusOK)
 }

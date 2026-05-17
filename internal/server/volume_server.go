@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -29,17 +28,32 @@ func NewVolumeServer(addr string, store *storage.Store, dir string) *VolumeServe
 	}
 }
 
-func (s *VolumeServer) Start() {
+func (s *VolumeServer) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/read", s.Read)
 	mux.HandleFunc("/write", s.Write)
 	mux.HandleFunc("/create", s.Create)
 
-	err := http.ListenAndServe(s.Addr, mux)
-	if err != nil {
-		log.Fatal(err)
+	srv := &http.Server{Addr: s.Addr, Handler: mux}
+
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			srv.Shutdown(shutdownCtx)
+		case <-done:
+		}
+	}()
+
+	err := srv.ListenAndServe()
+	close(done)
+	if err == http.ErrServerClosed {
+		return nil
 	}
+	return err
 }
 
 func (s *VolumeServer) Read(w http.ResponseWriter, r *http.Request) {
