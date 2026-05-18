@@ -64,3 +64,10 @@ func (v *Volume) Write(needle *Needle) error {
 
 	return nil
 }
+
+func (v *Volume) HeartbeatStats() (VolumeID, uint64) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	return v.ID, uint64(v.Offset)
+}

@@ -1,10 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -62,6 +64,8 @@ func (s *VolumeServer) Start(ctx context.Context) error {
 		case <-done:
 		}
 	}()
+
+	go s.worker(ctx)
 
 	err := srv.ListenAndServe()
 	close(done)
@@ -173,28 +177,53 @@ func (s *VolumeServer) Create(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *VolumeServer) worker(ctx context.Context, pulseInterval time.Duration) (<-chan struct{}, <-chan int) {
-	heartbeat := make(chan struct{})
-	results := make(chan int)
+func (s *VolumeServer) worker(ctx context.Context) {
+	client := &http.Client{Timeout: s.HeartbeatInterval / 2}
 
-	go func() {
-		defer close(heartbeat)
-		defer close(results)
-
-		pulse := time.NewTicker(pulseInterval)
-		defer pulse.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-pulse.C:
-				select {
-				case heartbeat <- struct{}{}:
-				default:
-				}
-			}
+	sendOnce := func() {
+		vols := s.Store.Snapshot()
+		reports := []VolumeReport{}
+		for _, v := range vols {
+			id, size := v.HeartbeatStats()
+			reports = append(reports, VolumeReport{VolumeID: id, Size: size})
 		}
-	}()
-	return heartbeat, results
+
+		body := HeartbeatRequest{Addr: s.Addr, Volumes: reports}
+		buf, err := json.Marshal(body)
+		if err != nil {
+			log.Printf("heartbeat failed: %v", err)
+			return
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "POST", "http://"+s.MasterAddr+"/heartbeat", bytes.NewReader(buf))
+		if err != nil {
+			log.Printf("heartbeat failed: %v", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("heartbeat failed: %v", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			log.Printf("heartbeat got %d", resp.StatusCode)
+		}
+	}
+
+	sendOnce()
+
+	ticker := time.NewTicker(s.HeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sendOnce()
+		}
+	}
 }
