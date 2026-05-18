@@ -22,6 +22,8 @@ type MasterServer struct {
 	VolumeServers        []string
 	VolumeSizeLimitBytes uint64
 	NextVolumeID         storage.VolumeID
+	LastHeartbeat        map[string]time.Time
+	StalenessThreshold   time.Duration
 	mu                   sync.Mutex
 }
 
@@ -31,6 +33,8 @@ func NewMasterServer(addr string) *MasterServer {
 		Volumes:              make(map[storage.VolumeID]*VolumeInfo),
 		VolumeSizeLimitBytes: 3 * 1024 * 1024 * 1024,
 		NextVolumeID:         0,
+		LastHeartbeat:        make(map[string]time.Time),
+		StalenessThreshold:   DefaultStalenessThreshold,
 	}
 }
 

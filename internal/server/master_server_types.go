@@ -15,3 +15,13 @@ type UpdateVolumeRequest struct {
 	VolumeID storage.VolumeID
 	Size     uint64
 }
+
+type VolumeReport struct {
+	VolumeID storage.VolumeID
+	Size     uint64
+}
+
+type HeartbeatRequest struct {
+	Addr    string
+	Volumes []VolumeReport
+}

@@ -14,17 +14,32 @@ import (
 	"github.com/jkwan419/go-dfs/internal/storage"
 )
 
-type VolumeServer struct {
-	Addr    string
-	Store   *storage.Store
-	DataDir string
+type VolumeServerConfig struct {
+	Addr              string
+	MasterAddr        string
+	DataDir           string
+	HeartbeatInterval time.Duration
 }
 
-func NewVolumeServer(addr string, store *storage.Store, dir string) *VolumeServer {
+type VolumeServer struct {
+	Addr              string
+	MasterAddr        string
+	Store             *storage.Store
+	DataDir           string
+	HeartbeatInterval time.Duration
+}
+
+func NewVolumeServer(cfg VolumeServerConfig, store *storage.Store) *VolumeServer {
+	interval := cfg.HeartbeatInterval
+	if interval == 0 {
+		interval = DefaultHeartbeatInterval
+	}
 	return &VolumeServer{
-		Addr:    addr,
-		Store:   store,
-		DataDir: dir,
+		Addr:              cfg.Addr,
+		MasterAddr:        cfg.MasterAddr,
+		Store:             store,
+		DataDir:           cfg.DataDir,
+		HeartbeatInterval: interval,
 	}
 }
 
