@@ -44,25 +44,32 @@ func (v *Volume) Read(needleID uint64) (*Needle, error) {
 	return needle, nil
 }
 
-func (v *Volume) Write(needle *Needle) error {
+func (v *Volume) Write(data []byte, cookie uint32) (uint64, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
+	needle := &Needle{
+		Cookie: cookie,
+		ID:     v.NextID,
+		Size:   uint32(len(data)),
+		Data:   data,
+	}
+
 	_, err := v.VolumeFile.WriteAt(needle.Marshal(), v.Offset)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	err = WriteToFile(v.IndexFile, needle.ID, v.Offset)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	v.Index[needle.ID] = v.Offset
 	v.Offset += NeedleDiskSize(needle.Size)
 	v.NextID += 1
 
-	return nil
+	return needle.ID, nil
 }
 
 func (v *Volume) HeartbeatStats() (VolumeID, uint64) {

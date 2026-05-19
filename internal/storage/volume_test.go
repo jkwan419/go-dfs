@@ -29,15 +29,15 @@ func TestVolumeRead(t *testing.T) {
 
 	needle := &Needle{
 		Cookie: 0xDEADBEEF,
-		ID:     0x0000000000000001,
 		Data:   []byte("test"),
 		Size:   4,
 	}
 
-	err = volume.Write(needle)
+	id, err := volume.Write(needle.Data, needle.Cookie)
 	if err != nil {
 		t.Fatal(err)
 	}
+	needle.ID = id
 
 	tests := []struct {
 		name        string
@@ -47,12 +47,12 @@ func TestVolumeRead(t *testing.T) {
 	}{
 		{
 			name:     "happy path",
-			input:    0x0000000000000001,
+			input:    id,
 			expected: needle,
 		},
 		{
 			name:        "invalid needle id",
-			input:       0x0000000000000000,
+			input:       id + 1,
 			expectedErr: true,
 		},
 	}
@@ -105,7 +105,6 @@ func TestVolumeWrite(t *testing.T) {
 
 	needle := &Needle{
 		Cookie: 0xDEADBEEF,
-		ID:     0x0000000000000001,
 		Data:   []byte("test"),
 		Size:   4,
 	}
@@ -123,13 +122,13 @@ func TestVolumeWrite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := volume.Write(tt.input)
+			id, err := volume.Write(tt.input.Data, tt.input.Cookie)
 			if (err != nil) != tt.expectedErr {
 				t.Errorf("Write(%q) error = %v, expectedErr %v", tt.input, err, tt.expectedErr)
 			}
 			if !tt.expectedErr {
-				if volume.Index[tt.input.ID] != 0 {
-					t.Errorf("Offset = %v, expected = 0", volume.Index[tt.input.ID])
+				if volume.Index[id] != 0 {
+					t.Errorf("Offset = %v, expected = 0", volume.Index[id])
 				}
 				if volume.Offset != NeedleDiskSize(tt.input.Size) {
 					t.Errorf("Offset = %v, expected = %v", volume.Offset, NeedleDiskSize(tt.input.Size))
