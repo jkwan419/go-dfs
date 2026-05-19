@@ -181,6 +181,10 @@ func (s *VolumeServer) worker(ctx context.Context) {
 	client := &http.Client{Timeout: s.HeartbeatInterval / 2}
 
 	sendOnce := func() {
+		// Locker order: Store mutex first (via Snapshot), then per-Volume mutex
+		// (via Heartbeatstats). Never the reverse - Snapshot already released the
+		// Store lock before we touch any Volume, but the rule still applies to any
+		// future code added here.
 		vols := s.Store.Snapshot()
 		reports := []VolumeReport{}
 		for _, v := range vols {

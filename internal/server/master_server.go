@@ -44,8 +44,6 @@ func (s *MasterServer) Start(ctx context.Context) error {
 
 	mux.HandleFunc("/read", s.Read)
 	mux.HandleFunc("/upload", s.Upload)
-	mux.HandleFunc("/register", s.Register)
-	mux.HandleFunc("/update", s.UpdateVolume)
 	mux.HandleFunc("/heartbeat", s.Heartbeat)
 
 	srv := &http.Server{Addr: s.Addr, Handler: mux}
@@ -60,6 +58,8 @@ func (s *MasterServer) Start(ctx context.Context) error {
 		case <-done:
 		}
 	}()
+
+	go s.sweeper(ctx)
 
 	err := srv.ListenAndServe()
 	close(done)
@@ -141,39 +141,6 @@ func (s *MasterServer) Upload(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (s *MasterServer) Register(w http.ResponseWriter, r *http.Request) {
-	var req RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.VolumeServers = append(s.VolumeServers, req.Addr)
-
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
-}
-
-func (s *MasterServer) UpdateVolume(w http.ResponseWriter, r *http.Request) {
-	var req UpdateVolumeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	volume, ok := s.Volumes[req.VolumeID]
-	if !ok {
-		http.Error(w, "invalid volume id", http.StatusBadRequest)
-		return
-	}
-	volume.Size = req.Size
-	w.WriteHeader(http.StatusOK)
-}
-
 func (s *MasterServer) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	var req HeartbeatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -203,4 +170,42 @@ func (s *MasterServer) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *MasterServer) sweep() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	for addr, ts := range s.LastHeartbeat {
+		if now.Sub(ts) <= s.StalenessThreshold {
+			continue
+		}
+		// Evict:
+		//	- remove addr from VolumeServers
+		s.VolumeServers = slices.DeleteFunc(s.VolumeServers, func(v string) bool {
+			return v == addr
+		})
+		//	- delete all volumes whose Addr == addr
+		for vid, info := range s.Volumes {
+			if info.Addr == addr {
+				delete(s.Volumes, vid)
+			}
+		}
+		//	- delete LastHeartbeat[addr]
+		delete(s.LastHeartbeat, addr)
+	}
+}
+
+func (s *MasterServer) sweeper(ctx context.Context) {
+	ticker := time.NewTicker(s.StalenessThreshold / 2)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.sweep()
+		}
+	}
 }
