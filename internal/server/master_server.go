@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -45,6 +46,7 @@ func (s *MasterServer) Start(ctx context.Context) error {
 	mux.HandleFunc("/upload", s.Upload)
 	mux.HandleFunc("/register", s.Register)
 	mux.HandleFunc("/update", s.UpdateVolume)
+	mux.HandleFunc("/heartbeat", s.Heartbeat)
 
 	srv := &http.Server{Addr: s.Addr, Handler: mux}
 
@@ -169,5 +171,36 @@ func (s *MasterServer) UpdateVolume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	volume.Size = req.Size
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *MasterServer) Heartbeat(w http.ResponseWriter, r *http.Request) {
+	var req HeartbeatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !slices.Contains(s.VolumeServers, req.Addr) {
+		s.VolumeServers = append(s.VolumeServers, req.Addr)
+	}
+	s.LastHeartbeat[req.Addr] = time.Now()
+
+	for vid, info := range s.Volumes {
+		if info.Addr == req.Addr {
+			delete(s.Volumes, vid)
+		}
+	}
+
+	for _, report := range req.Volumes {
+		s.Volumes[report.VolumeID] = &VolumeInfo{Addr: req.Addr, Size: report.Size}
+		if report.VolumeID >= s.NextVolumeID {
+			s.NextVolumeID = report.VolumeID + 1
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
