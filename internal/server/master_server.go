@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"slices"
 	"sync"
@@ -147,6 +148,8 @@ func (s *MasterServer) Heartbeat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("heartbeat from %s with %d volumes", req.Addr, len(req.Volumes))
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
