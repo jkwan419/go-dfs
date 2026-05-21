@@ -3,9 +3,14 @@ package storage
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"hash/crc32"
 	"io"
+)
+
+var (
+	ErrBadMagic    = errors.New("bad needle magic")
+	ErrBadChecksum = errors.New("bad needle checksum")
 )
 
 var magicBytes = []byte{0x08, 0x05, 0x18, 0x86}
@@ -66,7 +71,7 @@ func ReadNeedleAt(r io.ReaderAt, offset int64) (*Needle, error) {
 
 	// Check magic bytes
 	if !bytes.Equal(header[0:4], magicBytes) {
-		return nil, fmt.Errorf("incorrect offset")
+		return nil, ErrBadMagic
 	}
 
 	size := binary.BigEndian.Uint32(header[16:20])
@@ -80,7 +85,7 @@ func ReadNeedleAt(r io.ReaderAt, offset int64) (*Needle, error) {
 	computedChecksum := crc32.ChecksumIEEE(data[:len(data)-4])
 	storedChecksum := binary.BigEndian.Uint32(data[len(data)-4:])
 	if computedChecksum != storedChecksum {
-		return nil, fmt.Errorf("corrupted data")
+		return nil, ErrBadChecksum
 	}
 
 	n := &Needle{
